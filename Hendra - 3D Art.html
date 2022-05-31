@@ -1,0 +1,165 @@
+<html>
+<head>
+	<title> Hendra - 3D Art </title>
+	<link href="https://fonts.googleapis.com/css?family=Oswald" rel="stylesheet">
+</head>
+<style>
+	body {
+		margin: 0px;
+	}
+	canvas {
+		width: 500px;
+		height: 500px;
+		margin-top:-9px;
+		margin-left:215.2px;
+		background-color:#e1e4fa;
+		box-shadow : 0 4px 8px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.23);
+		border-radius:25px;
+	}
+</style>
+<body>
+	<h2 style = "padding-left:365px;
+	font-family:Oswald;"> UTS: 3D Art Drawing</h2>
+	<canvas id="canvas"></canvas>
+	<script src="https://webgl2fundamentals.org/webgl/resources/twgl-full.min.js"></script>
+	<script src="https://webgl2fundamentals.org/webgl/resources/m4.js"></script>
+	<script src="https://webgl2fundamentals.org/webgl/resources/flattened-primitives.js"></script>
+	<script>
+	"use strict";
+	var vs = `#version 300 es
+
+	in vec4 a_position; 
+	in vec4 a_color;
+	uniform mat4 u_matrix;
+	out vec4 v_color;
+
+	void main() { 
+	gl_Position = u_matrix * a_position;
+	v_color = a_color;
+	}
+	`;
+
+	var fs = `#version 300 es
+	precision highp float;
+	in vec4 v_color;
+	uniform vec4 u_colorMult;
+	out vec4 outColor;
+
+	void main() {
+		outColor = v_color * u_colorMult;
+	}
+	`;
+
+	function main() {
+	/** @type {HTMLCanvasElement} */
+	var canvas = document.querySelector("#canvas");
+	var gl = canvas.getContext("webgl2");
+	if (!gl) {
+		return;
+	}
+	
+	twgl.setAttributePrefix("a_");
+		
+	var sphereBufferInfo = flattenedPrimitives.createSphereBufferInfo(gl, 30, 8, 2); //untuk membuat kerangka 3D belah ketupat
+	var cubeBufferInfo   = flattenedPrimitives.createCubeBufferInfo(gl, 30); //untuk membuat kerangka 3D kubus
+	var programInfo = twgl.createProgramInfo(gl, [vs, fs]);
+
+	var sphereVAO = twgl.createVAOFromBufferInfo(gl, programInfo, sphereBufferInfo);
+	var cubeVAO   = twgl.createVAOFromBufferInfo(gl, programInfo, cubeBufferInfo);
+
+	function degToRad(d) {
+		return d * Math.PI / 180; //untuk pengaturan angle objek
+	}
+	var fieldOfViewRadians = degToRad(60);
+	var sphereUniforms = {  //structure and organization (referensi webgl2)
+		u_colorMult: [0.1, 1, 0.5, 1], //pengaturan warna belah ketupat
+		u_matrix: m4.identity(),
+	};
+	var cubeUniforms = { 
+		u_colorMult: [0.9, 0.53, 0.9, 1], //pengaturan warna kubus
+		u_matrix: m4.identity(),
+	};
+
+	var sphereTranslation = [-31, 30, 0]; //translation
+	var cubeTranslation   = [20, -30, 0]; //translation
+
+	var objectsToDraw = [ //deklarasi variabel objectsToDraw
+		{
+		programInfo: programInfo, //untuk info buffer, vertex, uniform belah ketupat
+		bufferInfo: sphereBufferInfo,
+		vertexArray: sphereVAO,
+		uniforms: sphereUniforms,
+		},
+		{
+		programInfo: programInfo, //untuk info buffer, vertex, uniform kubus
+		bufferInfo: cubeBufferInfo,
+		vertexArray: cubeVAO,
+		uniforms: cubeUniforms,
+		},
+	];
+		 
+	function computeMatrix(viewProjectionMatrix, translation, xRotation, yRotation) {
+		var matrix = m4.translate(viewProjectionMatrix,
+			translation[0], 
+			translation[1],
+			translation[2]);
+		matrix = m4.xRotate(matrix, xRotation);
+		return m4.yRotate(matrix, yRotation);
+	}
+	
+	requestAnimationFrame(drawScene);
+	
+	function drawScene(time) { 
+		time = time * 0.0003; //durasi objek untuk berotasi
+	
+    twgl.resizeCanvasToDisplaySize(gl.canvas);
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+	gl.enable(gl.CULL_FACE);
+    gl.enable(gl.DEPTH_TEST);
+			
+    var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+    var projectionMatrix =
+        m4.perspective(fieldOfViewRadians, aspect, 1, 2000);
+
+    var cameraPosition = [0, -90, 100]; //mengatur posisi angle camera, dari sisi bagaimana objek akan ditampilkan
+    var target = [0, 0, 0];
+    var up = [0, 1, 0];
+    var cameraMatrix = m4.lookAt(cameraPosition, target, up);
+	
+    var viewMatrix = m4.inverse(cameraMatrix);
+    var viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
+	
+    var sphereXRotation =  time;
+    var sphereYRotation =  time;
+    var cubeXRotation   = -time;
+    var cubeYRotation   =  time;
+	
+	sphereUniforms.u_matrix = computeMatrix(
+        viewProjectionMatrix,
+        sphereTranslation,
+        sphereXRotation,
+        sphereYRotation);
+		
+    cubeUniforms.u_matrix = computeMatrix(
+        viewProjectionMatrix,
+        cubeTranslation,
+        cubeXRotation,
+        cubeYRotation);
+
+    objectsToDraw.forEach(function(object) { //fungsi objectsToDraw berperan dalam menampilkan objek
+      var programInfo = object.programInfo;
+	
+      gl.useProgram(programInfo.program);
+      gl.bindVertexArray(object.vertexArray);
+	  
+      twgl.setUniforms(programInfo, object.uniforms);
+      twgl.drawBufferInfo(gl, object.bufferInfo);
+	  
+    });
+    requestAnimationFrame(drawScene);
+  }
+}
+main();
+</script>
+</body>
+</html>
